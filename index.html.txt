@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dynamic A4 Result PDF Generator</title>
+
+<!-- External Libraries -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#eef2f7;font-family:Arial,Helvetica,sans-serif;color:#000000}
+
+/* --- LOGIN SCREEN STYLES --- */
+#loginOverlay{
+  position:fixed;top:0;left:0;width:100vw;height:100vh;
+  background:linear-gradient(135deg, #1e3a8a, #0f172a);
+  display:flex;align-items:center;justify-content:center;z-index:99999;
+}
+.login-card{
+  background:#ffffff;border-radius:12px;padding:28px 24px;width:100%;max-width:380px;
+  box-shadow:0 10px 25px rgba(0,0,0,0.25);text-align:center;
+}
+.login-card h2{margin:0 0 8px;color:#1e3a8a;font-size:20px}
+.login-card p{margin:0 0 18px;color:#64748b;font-size:13px}
+.login-card input[type="password"]{
+  width:100%;padding:10px 12px;border:1.5px solid #cbd5e1;border-radius:6px;font-size:14px;margin-bottom:12px;outline:none;
+}
+.login-btn{
+  width:100%;background:#1e3a8a;color:#fff;border:none;padding:10px;font-size:14px;font-weight:bold;border-radius:6px;cursor:pointer;
+}
+.login-btn:hover{background:#172554}
+#loginError{color:#ef4444;font-size:12px;margin-top:10px;display:none;font-weight:bold}
+
+/* --- ADMIN SETTINGS MODAL --- */
+#adminModal{
+  position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(15,23,42,0.65);
+  backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;z-index:99998;
+}
+.admin-card{
+  background:#ffffff;border-radius:12px;padding:22px;width:100%;max-width:520px;
+  box-shadow:0 12px 30px rgba(0,0,0,0.3);text-align:left;max-height:90vh;display:flex;flex-direction:column;
+}
+.admin-card h3{margin:0 0 4px;color:#1e3a8a;font-size:18px;display:flex;justify-content:space-between;align-items:center}
+.admin-card .admin-sub{color:#64748b;font-size:12px;margin-bottom:14px}
+.admin-field{margin-bottom:12px}
+.admin-field label{display:block;font-size:12px;font-weight:bold;margin-bottom:4px;color:#334155}
+.admin-field input{width:100%;padding:8px 10px;border:1.5px solid #cbd5e1;border-radius:6px;font-size:13px;outline:none}
+.sheet-list-container{flex:1;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px;padding:8px;background:#f8fafc;max-height:160px;margin-bottom:12px}
+.sheet-list-item{display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid #cbd5e1;padding:6px 10px;border-radius:5px;margin-bottom:6px;font-size:12px}
+.btn-del-sheet{background:#ef4444;color:#fff;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px}
+.btn-add-sheet{flex:1;background:#059669;color:#fff;border:none;padding:9px;border-radius:6px;font-weight:bold;cursor:pointer;font-size:12.5px}
+.btn-close-modal{background:#94a3b8;color:#fff;border:none;padding:9px 14px;border-radius:6px;font-weight:bold;cursor:pointer;font-size:12.5px}
+#adminMsg{margin-top:8px;font-size:12px;font-weight:bold;display:none}
+
+/* --- MAIN APP LAYOUT --- */
+.container{max-width:1380px;margin:16px auto;padding:0 12px}
+.card{background:#fff;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.08);padding:18px}
+.header-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;gap:8px}
+h1{margin:0;font-size:22px;color:#1e3a8a;flex:1;text-align:center}
+.btn-admin-open{background:#3b82f6;color:#fff;padding:6px 12px;border:none;border-radius:6px;font-size:11.5px;font-weight:bold;cursor:pointer}
+.btn-logout{background:#64748b;color:#fff;padding:6px 12px;border:none;border-radius:6px;font-size:11.5px;font-weight:bold;cursor:pointer}
+.sub{text-align:center;color:#475569;margin-bottom:12px;font-size:13px}
+
+/* --- INPUT SOURCE BAR --- */
+.source-selection-bar{
+  background:#f1f5f9;border:1.5px solid #cbd5e1;border-radius:8px;padding:14px;margin-bottom:12px;display:flex;flex-direction:column;gap:12px;
+}
+.source-top-row{display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap}
+.btn-native-file{
+  background:#0284c7;color:#fff;padding:10px 18px;border:none;border-radius:8px;font-size:13.5px;font-weight:bold;cursor:pointer;display:flex;align-items:center;gap:8px;
+}
+.source-dropdown-row{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;border-top:1px dashed #cbd5e1;padding-top:10px}
+.source-dropdown-row select{padding:6px 12px;font-size:12.5px;font-weight:bold;border:1.5px solid #0284c7;border-radius:6px;background:#fff;min-width:280px;max-width:440px}
+.btn-refresh-live{background:#64748b;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:bold;cursor:pointer}
+
+.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:center}
+button{border:0;border-radius:6px;padding:9px 15px;font-weight:bold;cursor:pointer;font-size:12.5px;transition:0.2s}
+.btn-single{background:#059669;color:#fff}
+.btn-all{background:#1e3a8a;color:#fff}
+.btn-zip{background:#0284c7;color:#fff}
+button:disabled{opacity:.45;cursor:not-allowed}
+#status{margin-top:10px;text-align:center;font-weight:bold;color:#334155;font-size:13px}
+
+/* --- CUSTOMIZATION PANEL --- */
+.custom-panel{
+  margin-top:12px;background:#f8fafc;border:1.5px solid #cbd5e1;border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:12px;
+}
+.panel-section-title{font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:0.4px;color:#475569;border-bottom:1px dashed #cbd5e1;padding-bottom:3px;margin-bottom:4px}
+.control-row{display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;font-size:12px}
+.control-group{display:flex;align-items:center;gap:6px}
+.control-group label{font-weight:bold;color:#1e293b}
+.control-group input[type="text"]{padding:4px 8px;font-size:12px;border-radius:5px;border:1px solid #94a3b8;width:230px}
+.control-group input[type="color"]{border:1px solid #94a3b8;border-radius:4px;width:30px;height:26px;padding:1px;cursor:pointer;background:#fff}
+.control-group select{padding:4px 8px;font-weight:bold;border-radius:5px;border:1px solid #94a3b8}
+
+.preview-header{display:flex;justify-content:space-between;align-items:center;margin:16px 0 8px}
+.preview-title{font-weight:bold;font-size:15px;color:#1e293b}
+#previewWrap{overflow:auto;border:1px solid #cbd5e1;background:#64748b;padding:10px;border-radius:6px}
+#preview{background:white;margin:auto}
+.hidden{display:none}
+
+/* --- A4 LANDSCAPE EXACT STYLES --- */
+:root{--font-scale: 1.0;--border-dark: #000000}
+
+.sheet{
+  width:297mm;height:200mm;max-height:200mm;background:#fff;padding:3mm 5mm;box-sizing:border-box;
+  display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;page-break-inside:avoid;break-inside:avoid;
+}
+.sheet-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5mm;min-height:10mm}
+.header-text-box{flex:1;text-align:center;padding:0 4mm}
+.sheet-header .title{font-size:calc(16px * var(--font-scale));font-weight:900;text-transform:uppercase;letter-spacing:0.3px}
+.sheet-header .subtitle{font-size:calc(11px * var(--font-scale));font-weight:800;margin-top:1px}
+
+.student-container{
+  flex:1;display:flex;flex-direction:column;justify-content:space-between;gap:1.2mm;height:calc(200mm - 22mm);overflow:hidden;
+}
+.student-container-p2{height:calc(200mm - 11mm) !important}
+
+.student-card{
+  flex:1;width:100%;height:100%;border-collapse:collapse;table-layout:fixed;border:0.45mm solid var(--border-dark);
+}
+.student-card th, .student-card td{
+  border:0.25mm solid var(--border-dark);text-align:center;vertical-align:middle;padding:0px 1px;line-height:1.0;overflow:hidden;white-space:nowrap;
+}
+.student-card .col-rn{width:10mm}
+.student-card .col-name{width:40mm}
+.student-card .col-summary-tot{width:16mm}
+.student-card .col-summary-per{width:21mm}
+
+.student-card .subj-head-1{font-size:calc(11px * var(--font-scale));font-weight:900;letter-spacing:0.1px}
+.student-card .subj-head-2{font-size:calc(11px * var(--font-scale));font-weight:900;letter-spacing:0.1px;border-top:0.4mm solid var(--border-dark) !important}
+.student-card .subhead-cell-1, .student-card .subhead-cell-2{font-size:calc(9px * var(--font-scale));font-weight:800}
+
+.student-card .rn-box{font-size:calc(15px * var(--font-scale));font-weight:900}
+.student-card .rn-label, .student-card .name-label{font-size:calc(7.5px * var(--font-scale));display:block;font-weight:800}
+.student-card .name-box{text-align:left;padding-left:2mm;font-size:calc(11.5px * var(--font-scale));font-weight:900;white-space:normal;word-break:break-word}
+.student-card .mark-val{font-size:calc(15px * var(--font-scale));font-weight:900}
+.student-card .total-val{font-size:calc(15px * var(--font-scale));font-weight:900;background:rgba(0,0,0,0.05)}
+.student-card .grand-box{font-size:calc(15px * var(--font-scale));font-weight:900;border-left:0.4mm solid var(--border-dark) !important;border-right:0.4mm solid var(--border-dark) !important}
+.student-card .grand-label{font-size:calc(7.5px * var(--font-scale));display:block;line-height:1.0;font-weight:900;margin-bottom:1px;white-space:normal}
+
+/* FA Table Styles */
+.fa-table-wrap{flex:1;width:100%;height:calc(200mm - 22mm);display:flex;overflow:hidden}
+.fa-table-wrap-p2{height:calc(200mm - 11mm) !important}
+.fa-table{flex:1;width:100%;border-collapse:collapse;table-layout:fixed;border:0.45mm solid var(--border-dark);background:#ffffff}
+.fa-table th, .fa-table td{border:0.25mm solid var(--border-dark);text-align:center;vertical-align:middle;padding:0px 1px;line-height:1.0;overflow:hidden;white-space:nowrap}
+.fa-table th.fa-head{font-size:calc(11px * var(--font-scale));font-weight:900}
+.fa-table th.fa-rn, .fa-table th.fa-name{font-size:calc(11px * var(--font-scale));font-weight:900}
+.fa-table th.fa-summary{font-size:calc(10px * var(--font-scale));font-weight:900}
+.fa-table td.fa-rn-val{font-size:calc(14.5px * var(--font-scale));font-weight:900}
+.fa-table td.fa-name-val{text-align:left;padding-left:2mm;font-size:calc(11.5px * var(--font-scale));font-weight:900;white-space:normal;word-break:break-word}
+.fa-table td.fa-mark-val{font-size:calc(14.5px * var(--font-scale));font-weight:900}
+.fa-table td.fa-grand-val{font-size:calc(14.5px * var(--font-scale));font-weight:900;border-left:0.35mm solid var(--border-dark) !important;border-right:0.35mm solid var(--border-dark) !important}
+.fa-table td.fa-per-val{font-size:calc(14.5px * var(--font-scale)) !important;font-weight:900;letter-spacing:-0.2px;text-align:center}
+
+.sheet-footer{
+  display:flex;justify-content:space-between;font-size:calc(8.5px * var(--font-scale));font-weight:800;color:#475569;margin-top:1mm;padding-top:0.5mm;border-top:0.2mm solid #cbd5e1;
+}
+.combinedPrint > .sheet{page-break-after:always;break-after:page}
+.combinedPrint > .sheet:last-child{page-break-after:avoid !important;break-after:avoid !important}
+@page{size:A4 landscape;margin:0}
+</style>
+</head>
+<body>
+
+<!-- Login Modal -->
+<div id="loginOverlay">
+  <div class="login-card">
+    <h2>🔒 Admin Access</h2>
+    <p>Please enter password to open portal</p>
+    <input type="password" id="passInput" placeholder="Enter Password" autocomplete="off">
+    <button type="button" class="login-btn" id="loginBtn">Login / Enter Portal</button>
+    <div id="loginError">Incorrect Password!</div>
+  </div>
+</div>
+
+<!-- Admin Modal -->
+<div id="adminModal">
+  <div class="admin-card">
+    <h3>⚙️ Google Sheets Manager <span style="font-size:14px;cursor:pointer" id="btnCloseModalTop">✕</span></h3>
+    <div class="admin-sub">यहाँ आप Google Sheets मैनेज कर सकते हैं।</div>
+    <div class="admin-field"><label>Admin Password:</label><input type="password" id="adminPassInput" placeholder="Password"></div>
+    <div class="admin-field"><label>Google Sheet ID / Link:</label><input type="text" id="adminSheetIdInput" placeholder="Sheet URL / ID"></div>
+    <button type="button" id="btnAddSheet" class="btn-add-sheet" style="margin-bottom:12px">+ Add Sheet</button>
+    <label style="font-size:12px;font-weight:bold;color:#334155;margin-bottom:4px;display:block">Saved Sheets:</label>
+    <div class="sheet-list-container" id="adminSheetsListWrap"><div style="text-align:center;font-size:11px;color:#64748b">Loading…</div></div>
+    <div style="display:flex;justify-content:flex-end"><button type="button" id="btnCloseAdminModal" class="btn-close-modal">Close</button></div>
+    <div id="adminMsg"></div>
+  </div>
+</div>
+
+<div class="container">
+  <div class="card">
+    <div class="header-top">
+      <button type="button" id="btnOpenAdmin" class="btn-admin-open">⚙ Admin Settings</button>
+      <h1>Dynamic A4 Result PDF Generator</h1>
+      <button type="button" id="logoutBtn" class="btn-logout" title="Lock">Lock 🔒</button>
+    </div>
+    <div class="sub">Alternate Subject Headers &bull; Complete Font &amp; Color Controls &bull; PC ZIP &bull; Mobile Drive Save</div>
+
+    <div class="source-selection-bar">
+      <div class="source-top-row">
+        <input type="file" id="nativeFileInput" style="display:none">
+        <button type="button" id="btnTriggerNativeFile" class="btn-native-file">📁 Choose File (Storage / Drive)</button>
+      </div>
+      <div class="source-dropdown-row">
+        <label style="font-weight:bold;font-size:12px;color:#334155">Saved Exams:</label>
+        <select id="examSheetDropdown"><option value="">-- Choose from Saved Sheets --</option></select>
+        <button type="button" id="btnRefreshLive" class="btn-refresh-live">🔄 Refresh</button>
+        <span id="currentLoadedLabel" style="font-weight:bold;font-size:12px;color:#0284c7;margin-left:6px"></span>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button id="generateSingle" class="btn-single" disabled>Print/Save Selected Class PDF</button>
+      <button id="generateAll" class="btn-all" disabled>Generate ALL Classes PDF</button>
+      <button id="generateSeparate" class="btn-zip" disabled>Generate Separate PDFs (ZIP / Drive)</button>
+    </div>
+
+    <div class="custom-panel">
+      <!-- Section 1 -->
+      <div class="panel-section-title">1. Header Information, Students Per Page &amp; Font Size</div>
+      <div class="control-row">
+        <div class="control-group">
+          <label>School Title:</label>
+          <input type="text" id="editSchoolTitle" placeholder="School Title">
+        </div>
+        <div class="control-group">
+          <label>Subtitle:</label>
+          <input type="text" id="editSchoolSubtitle" placeholder="Exam Info">
+        </div>
+        <div class="control-group">
+          <label style="color:#0369a1">Mode:</label>
+          <select id="assessmentModeSelect" style="background:#e0f2fe;border-color:#0284c7">
+            <option value="auto" selected>Auto-Detect</option>
+            <option value="FA">Formative (FA)</option>
+            <option value="SA">Summative (SA)</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label>Class:</label>
+          <select id="classSelect" disabled><option value="">-- Attach File First --</option></select>
+        </div>
+        
+        <!-- Students Per Page (Up to 10) -->
+        <div class="control-group">
+          <label style="color:#059669">Students/Page:</label>
+          <select id="perPageSelect" style="background:#ecfdf5;border-color:#10b981;font-weight:bold">
+            <option value="auto" selected>Auto-Fit (SA:5)</option>
+            <option value="4">4 Students</option>
+            <option value="5">5 Students (Standard)</option>
+            <option value="6">6 Students</option>
+            <option value="7">7 Students</option>
+            <option value="8">8 Students</option>
+            <option value="9">9 Students</option>
+            <option value="10">10 Students</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label style="color:#1e3a8a">Font Size:</label>
+          <button id="fontDecBtn" type="button" style="padding:2px 8px;background:#cbd5e1;border-radius:4px">-</button>
+          <span id="fontScaleVal" style="font-weight:bold;min-width:40px;text-align:center">100%</span>
+          <button id="fontIncBtn" type="button" style="padding:2px 8px;background:#cbd5e1;border-radius:4px">+</button>
+        </div>
+        <div class="control-group"><label><input id="showPreview" type="checkbox" checked> Show Preview</label></div>
+      </div>
+
+      <!-- Section 2: Subject Alternate Header Colors -->
+      <div class="panel-section-title">2. Subject Header Color Options (Alternate per Subject)</div>
+      <div class="control-row">
+        <div class="control-group">
+          <label style="color:#0284c7">Header Color Mode:</label>
+          <select id="headerColorMode" style="background:#e0f2fe;border-color:#0284c7;font-weight:bold">
+            <option value="auto" selected>🎨 Auto Alternate Colors (Per Subject)</option>
+            <option value="manual">🖌️ Manual Single Color</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label>Manual Header Bg:</label>
+          <input type="color" id="manualHeadBg" value="#bfdbfe">
+        </div>
+        <div class="control-group">
+          <label>Subhead Bg:</label>
+          <input type="color" id="subHeadBgLight" value="#dbeafe">
+        </div>
+        <div class="control-group">
+          <label style="color:#854d0e;font-weight:bold">Grand Total &amp; % Bg:</label>
+          <input type="color" id="grandBgInput" value="#fef08a">
+        </div>
+      </div>
+
+      <!-- Section 3: Complete Font Color Controls -->
+      <div class="panel-section-title">3. Complete Font Color Controls</div>
+      <div class="control-row">
+        <div class="control-group">
+          <label>Font Color Mode:</label>
+          <select id="fontModeSelect" style="background:#fef3c7;border-color:#d97706;font-weight:bold">
+            <option value="custom" selected>🎨 Custom Font Colors</option>
+            <option value="auto">🔄 Auto Black Defaults</option>
+          </select>
+        </div>
+        <div class="control-group"><label style="color:#1e3a8a">School Title:</label><input type="color" id="schoolTitleFontColor" value="#0f172a"></div>
+        <div class="control-group"><label style="color:#334155">Subtitle:</label><input type="color" id="subtitleFontColor" value="#0f172a"></div>
+        <div class="control-group"><label style="color:#0284c7">Subject Head:</label><input type="color" id="headerFontColor" value="#000000"></div>
+        <div class="control-group"><label style="color:#475569">Subhead:</label><input type="color" id="subheadFontColor" value="#000000"></div>
+      </div>
+      <div class="control-row">
+        <div class="control-group"><label>Student Name:</label><input type="color" id="nameFontColor" value="#000000"></div>
+        <div class="control-group"><label>Roll Number:</label><input type="color" id="rnFontColor" value="#000000"></div>
+        <div class="control-group"><label>Marks:</label><input type="color" id="marksFontColor" value="#000000"></div>
+        <div class="control-group"><label style="color:#854d0e">Grand Total &amp; %:</label><input type="color" id="grandFontColor" value="#000000"></div>
+        <div class="control-group"><button id="resetStylesBtn" type="button" style="padding:4px 10px;background:#e2e8f0;color:#334155;font-size:11.5px">Reset Settings</button></div>
+      </div>
+    </div>
+
+    <div id="status">Click "Choose File" or select an exam from dropdown…</div>
+    <div id="sheetList" style="margin-top:6px;text-align:center;font-size:12px;color:#475569"></div>
+
+    <div id="previewSection">
+      <div class="preview-header"><div class="preview-title" id="previewHeading">A4 Landscape Layout Preview</div></div>
+      <div id="previewWrap"><div id="preview"></div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// --- UTILITY FUNCTIONS ---
+function esc(v){ return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function fmt(v){
+  if(v === null || v === undefined || v === '') return '-';
+  if(typeof v === 'number') return Number.isInteger(v) ? String(v) : v.toFixed(2);
+  const s = String(v).trim(); const n = Number(s);
+  return (!isNaN(n) && s !== '') ? (Number.isInteger(n) ? String(n) : n.toFixed(2)) : esc(s);
+}
+
+function formatSubhead(text){
+  if(!text) return '-';
+  return esc(text).replace(/(\s+)(\d+(\.\d+)?)$/, '<br>$2');
+}
+
+const AUTO_HEADER_PALETTE = [
+  { headBg: '#bfdbfe', subBg: '#dbeafe' }, // Blue
+  { headBg: '#bbf7d0', subBg: '#dcfce7' }, // Green
+  { headBg: '#ddd6fe', subBg: '#ede9fe' }, // Purple
+  { headBg: '#fecdd3', subBg: '#ffe4e6' }, // Rose
+  { headBg: '#fef3c7', subBg: '#fffbeb' }, // Amber
+  { headBg: '#cffafe', subBg: '#e0f2fe' }  // Cyan
+];
+
+function getHeaderColorsForSubject(subjIndex){
+  const mode = document.getElementById('headerColorMode').value;
+  if(mode === 'manual'){
+    return {
+      headBg: manualHeadBg.value,
+      subBg: subHeadBgLight.value
+    };
+  }
+  return AUTO_HEADER_PALETTE[subjIndex % AUTO_HEADER_PALETTE.length];
+}
+
+function getThemeColors(){
+  const isCustomFont = (fontModeSelect.value === 'custom');
+  return {
+    titleColor: isCustomFont ? schoolTitleFontColor.value : '#0f172a',
+    subtitleColor: isCustomFont ? subtitleFontColor.value : '#0f172a',
+    headTextColor: isCustomFont ? headerFontColor.value : '#000000',
+    subheadTextColor: isCustomFont ? subheadFontColor.value : '#000000',
+    nameTextColor: isCustomFont ? nameFontColor.value : '#000000',
+    rnTextColor: isCustomFont ? rnFontColor.value : '#000000',
+    marksTextColor: isCustomFont ? marksFontColor.value : '#000000',
+    grandText: isCustomFont ? grandFontColor.value : '#000000',
+    grandBg: grandBgInput.value
+  };
+}
+
+const loginOverlay = document.getElementById('loginOverlay');
+const passInput = document.getElementById('passInput');
+const loginBtn = document.getElementById('loginBtn');
+const loginError = document.getElementById('loginError');
+const logoutBtn = document.getElementById('logoutBtn');
+const VALID_PASSWORDS = ['एडमिन@123', 'admin@123', 'Admin@123'];
+
+function checkAuthSession(){
+  if(sessionStorage.getItem('portal_auth_token') === 'verified_access'){
+    loginOverlay.style.display = 'none';
+  } else {
+    loginOverlay.style.display = 'flex';
+    passInput.focus();
+  }
+}
+function doLogin(){
+  if(VALID_PASSWORDS.includes(passInput.value.trim())){
+    sessionStorage.setItem('portal_auth_token', 'verified_access');
+    loginOverlay.style.display = 'none'; loginError.style.display = 'none'; passInput.value = '';
+    loadExamSheetsDropdown();
+  } else {
+    loginError.style.display = 'block'; passInput.value = ''; passInput.focus();
+  }
+}
+loginBtn.addEventListener('click', doLogin);
+passInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') doLogin(); });
+logoutBtn.addEventListener('click', ()=>{
+  sessionStorage.removeItem('portal_auth_token'); loginOverlay.style.display = 'flex'; passInput.focus();
+});
+checkAuthSession();
+
+// Native file input
+const nativeFileInput = document.getElementById('nativeFileInput');
+const btnTriggerNativeFile = document.getElementById('btnTriggerNativeFile');
+const currentLoadedLabel = document.getElementById('currentLoadedLabel');
+
+btnTriggerNativeFile.addEventListener('click', ()=>{ nativeFileInput.value = ''; nativeFileInput.click(); });
+nativeFileInput.addEventListener('change', async ()=>{
+  const file = nativeFileInput.files[0] || null; if(!file) return;
+  statusEl.textContent = `Reading attached file: ${file.name}…`;
+  currentLoadedTitle = file.name.replace(/\.[^/.]+$/, "");
+  currentLoadedLabel.textContent = `Attached: ${file.name}`;
+  try{
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data, {type:'array', cellFormula:false, cellNF:false, cellText:true});
+    rawSheetObjects = [];
+    for(const sName of wb.SheetNames){
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[sName], {header:1, defval:null, raw:true});
+      if(rows && rows.length >= 4) rawSheetObjects.push({ name: sName, rows: rows });
+    }
+    processLoadedRawSheets();
+  }catch(e){ console.error(e); statusEl.textContent = 'File Read Error: ' + e.message; }
+});
+
+// Admin modal
+const examSheetDropdown = document.getElementById('examSheetDropdown');
+const btnRefreshLive = document.getElementById('btnRefreshLive');
+const adminModal = document.getElementById('adminModal');
+const btnOpenAdmin = document.getElementById('btnOpenAdmin');
+const btnCloseAdminModal = document.getElementById('btnCloseAdminModal');
+const btnCloseModalTop = document.getElementById('btnCloseModalTop');
+const btnAddSheet = document.getElementById('btnAddSheet');
+const adminPassInput = document.getElementById('adminPassInput');
+const adminSheetIdInput = document.getElementById('adminSheetIdInput');
+const adminSheetsListWrap = document.getElementById('adminSheetsListWrap');
+const adminMsg = document.getElementById('adminMsg');
+
+let savedSheets = [];
+btnOpenAdmin.addEventListener('click', ()=>{
+  adminMsg.style.display = 'none'; adminPassInput.value = ''; adminSheetIdInput.value = '';
+  renderAdminSheetsList(); adminModal.style.display = 'flex'; adminPassInput.focus();
+});
+[btnCloseAdminModal, btnCloseModalTop].forEach(btn => {
+  btn.addEventListener('click', ()=>{ adminModal.style.display = 'none'; });
+});
+
+function loadExamSheetsDropdown(){
+  if(typeof google !== 'undefined' && google.script && google.script.run){
+    google.script.run.withSuccessHandler(function(list){
+      savedSheets = list || [];
+      examSheetDropdown.innerHTML = '<option value="">-- Choose from Saved Sheets --</option>';
+      savedSheets.forEach(s => {
+        const opt = document.createElement('option'); opt.value = s.id; opt.textContent = s.title; examSheetDropdown.appendChild(opt);
+      });
+    }).getSavedSheetsList();
+  }
+}
+function renderAdminSheetsList(){
+  adminSheetsListWrap.innerHTML = '';
+  if(savedSheets.length === 0){
+    adminSheetsListWrap.innerHTML = '<div style="text-align:center;font-size:11px;color:#64748b;padding:8px">No saved sheets yet.</div>';
+    return;
+  }
+  savedSheets.forEach(s => {
+    const item = document.createElement('div'); item.className = 'sheet-list-item';
+    item.innerHTML = `<span style="font-weight:bold;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:340px">${esc(s.title)}</span><button type="button" class="btn-del-sheet" data-id="${s.id}">Delete</button>`;
+    adminSheetsListWrap.appendChild(item);
+  });
+  adminSheetsListWrap.querySelectorAll('.btn-del-sheet').forEach(btn => {
+    btn.addEventListener('click', function(){ deleteSheetFromList(this.getAttribute('data-id')); });
+  });
+}
+btnAddSheet.addEventListener('click', ()=>{
+  const pass = adminPassInput.value.trim(); const inputVal = adminSheetIdInput.value.trim();
+  if(!pass){ showAdminMsg('Admin Password dalein!', true); return; }
+  if(!inputVal){ showAdminMsg('Google Sheet ID ya URL dalein!', true); return; }
+  showAdminMsg('Verifying…', false);
+  if(typeof google !== 'undefined' && google.script && google.script.run){
+    google.script.run.withSuccessHandler(function(res){
+      if(res.status === 'success'){
+        savedSheets = res.list; renderAdminSheetsList(); loadExamSheetsDropdown(); adminSheetIdInput.value = ''; showAdminMsg(res.message, false);
+      } else { showAdminMsg(res.message, true); }
+    }).manageSheetsConfig(pass, 'add', inputVal, '');
+  }
+});
+function deleteSheetFromList(targetId){
+  const pass = adminPassInput.value.trim();
+  if(!pass){ showAdminMsg('Hatane ke liye Admin Password dalein!', true); return; }
+  if(!confirm('Hatana chahte hain?')) return;
+  if(typeof google !== 'undefined' && google.script && google.script.run){
+    google.script.run.withSuccessHandler(function(res){
+      if(res.status === 'success'){ savedSheets = res.list; renderAdminSheetsList(); loadExamSheetsDropdown(); showAdminMsg(res.message, false); }
+      else { showAdminMsg(res.message, true); }
+    }).manageSheetsConfig(pass, 'delete', '', targetId);
+  }
+}
+function showAdminMsg(txt, isErr){
+  adminMsg.textContent = txt; adminMsg.style.color = isErr ? '#ef4444' : '#059669'; adminMsg.style.display = 'block';
+}
+function loadSheetByIdDirectly(fileId){
+  statusEl.textContent = 'Loading selected Sheet…';
+  if(typeof google !== 'undefined' && google.script && google.script.run){
+    google.script.run.withSuccessHandler(function(res){
+      if(res.status === 'success'){
+        currentLoadedTitle = res.fileName; currentLoadedLabel.textContent = `Live: ${res.fileName}`; rawSheetObjects = res.sheets; processLoadedRawSheets();
+      } else { statusEl.textContent = 'Error: ' + res.message; }
+    }).loadSheetDataById(fileId);
+  }
+}
+examSheetDropdown.addEventListener('change', ()=>{ if(examSheetDropdown.value) loadSheetByIdDirectly(examSheetDropdown.value); });
+btnRefreshLive.addEventListener('click', ()=>{ if(examSheetDropdown.value) loadSheetByIdDirectly(examSheetDropdown.value); });
+
+const generateSingleBtn = document.getElementById('generateSingle');
+const generateAllBtn = document.getElementById('generateAll');
+const generateSeparateBtn = document.getElementById('generateSeparate');
+const classSelect = document.getElementById('classSelect');
+const assessmentModeSelect = document.getElementById('assessmentModeSelect');
+const perPageSelect = document.getElementById('perPageSelect');
+const statusEl = document.getElementById('status');
+const preview = document.getElementById('preview');
+const previewHeading = document.getElementById('previewHeading');
+const editSchoolTitle = document.getElementById('editSchoolTitle');
+const editSchoolSubtitle = document.getElementById('editSchoolSubtitle');
+const fontDecBtn = document.getElementById('fontDecBtn');
+const fontIncBtn = document.getElementById('fontIncBtn');
+const fontScaleVal = document.getElementById('fontScaleVal');
+
+const headerColorMode = document.getElementById('headerColorMode');
+const manualHeadBg = document.getElementById('manualHeadBg');
+const subHeadBgLight = document.getElementById('subHeadBgLight');
+const grandBgInput = document.getElementById('grandBgInput');
+
+const fontModeSelect = document.getElementById('fontModeSelect');
+const schoolTitleFontColor = document.getElementById('schoolTitleFontColor');
+const subtitleFontColor = document.getElementById('subtitleFontColor');
+const headerFontColor = document.getElementById('headerFontColor');
+const subheadFontColor = document.getElementById('subheadFontColor');
+const nameFontColor = document.getElementById('nameFontColor');
+const rnFontColor = document.getElementById('rnFontColor');
+const marksFontColor = document.getElementById('marksFontColor');
+const grandFontColor = document.getElementById('grandFontColor');
+const resetStylesBtn = document.getElementById('resetStylesBtn');
+
+let currentLoadedTitle = 'EXAM_RESULT';
+let rawSheetObjects = []; 
+let workbookModels = [];
+let fontScale = 1.0;
+
+if (isMobileDevice()) {
+  generateSeparateBtn.textContent = 'Save Separate PDFs to Google Drive';
+  generateSeparateBtn.style.background = '#8b5cf6';
+}
+
+// Event Listeners for ALL inputs & dropdowns to update live preview instantly
+const allInputs = [
+  editSchoolTitle, editSchoolSubtitle, assessmentModeSelect, classSelect, perPageSelect,
+  headerColorMode, manualHeadBg, subHeadBgLight, grandBgInput,
+  fontModeSelect, schoolTitleFontColor, subtitleFontColor, headerFontColor,
+  subheadFontColor, nameFontColor, rnFontColor, marksFontColor, grandFontColor
+];
+
+allInputs.forEach(inp => {
+  if(inp) {
+    inp.addEventListener('input', renderSelectedClass);
+    inp.addEventListener('change', renderSelectedClass);
+  }
+});
+
+function updateRootStyles(){
+  document.documentElement.style.setProperty('--font-scale', fontScale);
+  fontScaleVal.textContent = Math.round(fontScale * 100) + '%';
+}
+fontDecBtn.addEventListener('click', ()=>{
+  if(fontScale > 0.80){ fontScale = Math.max(0.80, Math.round((fontScale - 0.05) * 100) / 100); updateRootStyles(); renderSelectedClass(); }
+});
+fontIncBtn.addEventListener('click', ()=>{
+  if(fontScale < 1.40){ fontScale = Math.min(1.40, Math.round((fontScale + 0.05) * 100) / 100); updateRootStyles(); renderSelectedClass(); }
+});
+resetStylesBtn.addEventListener('click', ()=>{
+  headerColorMode.value = 'auto'; fontModeSelect.value = 'custom'; perPageSelect.value = 'auto';
+  manualHeadBg.value = '#bfdbfe'; subHeadBgLight.value = '#dbeafe'; grandBgInput.value = '#fef08a';
+  schoolTitleFontColor.value = '#0f172a'; subtitleFontColor.value = '#0f172a'; headerFontColor.value = '#000000'; subheadFontColor.value = '#000000';
+  nameFontColor.value = '#000000'; rnFontColor.value = '#000000'; marksFontColor.value = '#000000'; grandFontColor.value = '#000000';
+  fontScale = 1.0; updateRootStyles(); renderSelectedClass();
+});
+
+function processLoadedRawSheets(){
+  try{
+    workbookModels = parseRawSheets(rawSheetObjects, assessmentModeSelect.value);
+    classSelect.innerHTML = '';
+    workbookModels.forEach((m, idx)=>{
+      const opt = document.createElement('option');
+      opt.value = idx; opt.textContent = `[${m.examType}] Class: ${m.sheetName} (${m.students.length} Students, ${m.subjects.length} Active Subjects)`;
+      classSelect.appendChild(opt);
+    });
+    if(workbookModels.length > 0){
+      editSchoolTitle.value = workbookModels[0].title || '';
+      editSchoolSubtitle.value = workbookModels[0].subtitleBase || '';
+    }
+    classSelect.disabled = false; generateSingleBtn.disabled = false; generateAllBtn.disabled = false; generateSeparateBtn.disabled = false;
+    const names = workbookModels.map(x => `${x.sheetName} (${x.subjects.length} Subj)`);
+    document.getElementById('sheetList').innerHTML = `<b>${workbookModels.length} Sheet(s) Ready:</b> ${names.map(esc).join(' • ')}`;
+    renderSelectedClass();
+    statusEl.textContent = `Ready: Loaded ${workbookModels.length} class sheet(s) successfully!`;
+  }catch(e){ console.error(e); statusEl.textContent = 'Parsing Error: ' + e.message; }
+}
+
+classSelect.addEventListener('change', ()=>{
+  const selectedIdx = parseInt(classSelect.value, 10);
+  if(!isNaN(selectedIdx) && workbookModels[selectedIdx]){
+    editSchoolSubtitle.value = workbookModels[selectedIdx].subtitleBase || '';
+  }
+  renderSelectedClass();
+});
+
+function renderSelectedClass(){
+  const selectedIdx = parseInt(classSelect.value, 10);
+  if(isNaN(selectedIdx) || !workbookModels[selectedIdx]) return;
+  const model = workbookModels[selectedIdx];
+  previewHeading.textContent = `Previewing: [${model.examType}] Class ${model.sheetName} (${model.students.length} Students, ${model.subjects.length} Active Subjects)`;
+  renderModelPages(model, selectedIdx);
+}
+
+// Universal Parsing Engine
+function parseRawSheets(sheetObjects, forceMode = 'auto'){
+  const models = [];
+  for(const item of sheetObjects){
+    const sheetName = item.name; const rows = item.rows;
+    if(!rows || rows.length < 4) continue;
+    let isSA = false; let saSubjectRow = -1, saHeaderRow = -1;
+    for(let r=0; r<Math.min(12, rows.length); r++){
+      const text = (rows[r]||[]).map(v=>String(v??'').toUpperCase()).join('|');
+      if((text.includes('POST MID') || text.includes('NOTE BOOK') || text.includes('ANNUAL')) && r > 0){
+        isSA = true; saSubjectRow = r - 1; saHeaderRow = r; break;
+      }
+    }
+    if(forceMode === 'SA') isSA = true; else if(forceMode === 'FA') isSA = false;
+
+    if(isSA){
+      const rowSubj = rows[saSubjectRow >= 0 ? saSubjectRow : 2] || [];
+      const rowHead = rows[saHeaderRow >= 0 ? saHeaderRow : 3] || [];
+      let rnCol = 0, nameCol = 1;
+      for(let c=0; c<rowHead.length; c++){
+        const s = String(rowHead[c]??'').toUpperCase();
+        if(s === 'RN' || s === 'ROLL') rnCol = c;
+        if(s === 'NAME' || s.includes('STUDENT NAME')) nameCol = c;
+      }
+      const rawSubjectIndices = [];
+      for(let c=0; c<rowSubj.length; c++){
+        const v = rowSubj[c]; const hText = String(rowHead[c]??'').toUpperCase().replace(/\s+/g,''); const sText = String(v??'').toUpperCase().replace(/\s+/g,'');
+        if(sText.includes('GRAND') || sText.includes('PERCENTAGE') || sText.includes('PER(%)') || sText === 'TOTAL' || hText.includes('GRAND') || hText.includes('PERCENTAGE') || hText.includes('PER(%)') || hText === 'TOTAL') break;
+        if(v!==null && v!=='' && !['GRAND TOTAL','PER(%)','PER (%)','PERCENTAGE','RN','ROLL','NAME','STUDENT NAME'].includes(String(v).trim().toUpperCase()) && c !== rnCol && c !== nameCol){
+          rawSubjectIndices.push({name: String(v).trim(), start: c});
+        }
+      }
+      if(rawSubjectIndices.length > 0){
+        const rawSubjects = []; let lastSubjectEndCol = 0;
+        for(let i=0; i<rawSubjectIndices.length; i++){
+          const curr = rawSubjectIndices[i]; const nextStart = (i + 1 < rawSubjectIndices.length) ? rawSubjectIndices[i+1].start : curr.start + 5;
+          const colCount = Math.max(1, nextStart - curr.start); lastSubjectEndCol = curr.start + colCount;
+          const subheads = [];
+          for(let off=0; off<colCount; off++){ const sh = rowHead[curr.start + off]; subheads.push(sh ? String(sh).trim().replace(/\s+/g,' ') : `Sub ${off+1}`); }
+          rawSubjects.push({name: curr.name, start: curr.start, colCount: colCount, subheads: subheads});
+        }
+        const grandCol = lastSubjectEndCol; const perCol = lastSubjectEndCol + 1;
+        const startRow = (saHeaderRow >= 0 ? saHeaderRow : 3) + 1;
+        const activeSubjects = [];
+        rawSubjects.forEach(s => {
+          let hasAnyMark = false;
+          for(let r=startRow; r<rows.length; r++){
+            const name = rows[r]?.[nameCol]; const rn = rows[r]?.[rnCol];
+            if((name && String(name).trim() !== '') || (rn && String(rn).trim() !== '')){
+              const block = (rows[r] || []).slice(s.start, s.start + s.colCount);
+              if(block.some(v => v !== null && v !== undefined && String(v).trim() !== '')){ hasAnyMark = true; break; }
+            }
+          }
+          if(hasAnyMark) activeSubjects.push(s);
+        });
+        const finalSubjects = (activeSubjects.length > 0) ? activeSubjects : rawSubjects;
+        const students = [];
+        for(let r=startRow; r<rows.length; r++){
+          const rn = rows[r]?.[rnCol]; const name = rows[r]?.[nameCol];
+          const blocks = finalSubjects.map(s => (rows[r] || []).slice(s.start, s.start + s.colCount));
+          const hasValidRoll = (typeof rn === 'number' || /^\d+$/.test(String(rn ?? '').trim()));
+          const hasName = (name && String(name).trim() !== '' && !['TOTAL', 'AVERAGE', 'PERCENTAGE', 'GRADE'].includes(String(name).trim().toUpperCase()));
+          const hasMarks = blocks.some(b => b.some(v => v !== null && v !== undefined && String(v).trim() !== ''));
+          if(hasName || (hasValidRoll && hasMarks)){
+            students.push({ rn: rn || (students.length + 1), name: hasName ? String(name).trim() : '-', blocks: blocks, grand: rows[r][grandCol] ?? null, per: rows[r][perCol] ?? null });
+          }
+        }
+        const title = (rows[0]||[]).find(v=>typeof v==='string' && v.trim().length > 3) || 'BRAHMADEV PUBLIC SCHOOL , SITAMARHI';
+        const subtitleRaw = (rows[1]||[]).find(v=>typeof v==='string' && v.trim().length > 3) || 'Session : 2026-27 ; MARKS STATEMENT (SA 1)';
+        const subtitleBase = subtitleRaw.replace(/Class\s*:\s*.*$/i, '').trim().replace(/;$/, '').trim();
+        models.push({ examType: 'SA', sheetName, title: title.trim(), subtitleBase, subjects: finalSubjects, students });
+      }
+    } else {
+      let faHeaderRow = -1;
+      for(let r=0; r<Math.min(10, rows.length); r++){
+        const rowStr = (rows[r]||[]).map(v=>String(v??'').toUpperCase()).join('|');
+        if((rowStr.includes('ROLL') || rowStr.includes('NAME') || rowStr.includes('RN')) && (rowStr.includes('TOTAL') || rowStr.includes('MATH') || rowStr.includes('ENGLISH') || rowStr.includes('OUT OF 20'))){
+          faHeaderRow = r; break;
+        }
+      }
+      if(faHeaderRow < 0) faHeaderRow = 3;
+      const hRow = rows[faHeaderRow] || [];
+      let rnCol = -1, nameCol = -1; const rawSubjects = [];
+      for(let c=0; c<hRow.length; c++){
+        const s = String(hRow[c]??'').trim().toUpperCase(); if(!s) continue;
+        if(s === 'ROLL' || s === 'RN' || s === 'R.NO' || s === 'ROLL NO' || s === 'ROLL NO.' || s === 'SL'){ rnCol = c; }
+        else if(s.includes('NAME')){ nameCol = c; }
+        else if(s === 'TOTAL' || s === 'GRAND TOTAL' || s === 'TOT' || s.includes('PER') || s.includes('%') || s.includes('PERCENT') || s.includes('F.MARKS') || s.includes('FULL MARKS')){ break; }
+        else { rawSubjects.push({ name: String(hRow[c]).trim().replace(/\(\s*OUT OF\s*20\s*\)/i, '').trim(), col: c }); }
+      }
+      if(rnCol === -1) rnCol = 0; if(nameCol === -1) nameCol = 1;
+      const lastSubjCol = rawSubjects.length > 0 ? rawSubjects[rawSubjects.length - 1].col : 1;
+      const totalCol = lastSubjCol + 1; const perCol = lastSubjCol + 2;
+      const activeSubjects = [];
+      rawSubjects.forEach(s => {
+        let hasAnyMark = false;
+        for(let r=faHeaderRow+1; r<rows.length; r++){
+          const name = rows[r]?.[nameCol]; const rn = rows[r]?.[rnCol];
+          if((name && String(name).trim() !== '') || (rn && String(rn).trim() !== '')){
+            const val = rows[r]?.[s.col]; if(val !== null && val !== undefined && String(val).trim() !== ''){ hasAnyMark = true; break; }
+          }
+        }
+        if(hasAnyMark) activeSubjects.push(s);
+      });
+      const finalSubjects = (activeSubjects.length > 0) ? activeSubjects : rawSubjects;
+      const students = [];
+      for(let r=faHeaderRow+1; r<rows.length; r++){
+        const rn = rows[r]?.[rnCol]; const name = rows[r]?.[nameCol];
+        const marks = finalSubjects.map(s => rows[r]?.[s.col] ?? null);
+        const hasValidRoll = (typeof rn === 'number' || /^\d+$/.test(String(rn ?? '').trim()));
+        const hasName = (name && String(name).trim() !== '' && !['TOTAL', 'AVERAGE', 'PERCENTAGE', 'GRADE'].includes(String(name).trim().toUpperCase()));
+        const hasMarks = marks.some(v => v !== null && v !== undefined && String(v).trim() !== '');
+        if(hasName || (hasValidRoll && hasMarks)){
+          students.push({ rn: rn || (students.length + 1), name: hasName ? String(name).trim() : '-', marks: marks, grand: rows[r]?.[totalCol] ?? null, per: rows[r]?.[perCol] ?? null });
+        }
+      }
+      if(!students.length) continue;
+      const title = (rows[0]||[]).find(v=>typeof v==='string' && v.trim().length > 3) || 'BRAHMADEV PUBLIC SCHOOL SITAMARHI';
+      const subtitleRaw = (rows[1]||[]).find(v=>typeof v==='string' && v.trim().length > 3) || 'FORMATIVE ASSESSMENT I 2026-27';
+      const subtitleBase = subtitleRaw.replace(/Class\s*:\s*.*$/i, '').trim().replace(/;$/, '').trim();
+      models.push({ examType: 'FA', sheetName, title: title.trim(), subtitleBase, subjects: finalSubjects, students });
+    }
+  }
+  if(!models.length) throw new Error('No valid class result detected in sheet data.');
+  return models;
+}
+
+function renderStudentCardSA(st, subj1, subj2, maxCols, stIdx){
+  const hasRow2 = subj2.length > 0;
+  const totalRowspan = hasRow2 ? 6 : 3;
+  const colors = getThemeColors();
+
+  let h = `<table class="student-card"><tbody>
+    <tr>
+      <td rowspan="${totalRowspan}" class="rn-box col-rn" style="background:#f1f5f9;color:${colors.rnTextColor}">
+        <span class="rn-label" style="color:${colors.rnTextColor}">RN</span>${fmt(st.rn)}
+      </td>
+      <td rowspan="${totalRowspan}" class="name-box col-name" style="background:#f1f5f9;color:${colors.nameTextColor}">
+        <span class="name-label" style="color:${colors.nameTextColor}">STUDENT NAME</span>${esc(st.name)}
+      </td>`;
+      
+      let r1ColSum = 0;
+      subj1.forEach((s, sIdx) => {
+        const hc = getHeaderColorsForSubject(sIdx);
+        h += `<th colspan="${s.colCount}" class="subj-head-1" style="background:${hc.headBg};color:${colors.headTextColor}">${esc(s.name)}</th>`;
+        r1ColSum += s.colCount;
+      });
+      if(r1ColSum < maxCols){
+        h += `<th colspan="${maxCols - r1ColSum}" class="subj-head-1" style="background:#e2e8f0;color:${colors.headTextColor}">-</th>`;
+      }
+
+      h += `<td rowspan="${totalRowspan}" class="grand-box col-summary-tot" style="background:${colors.grandBg};color:${colors.grandText}">
+        <span class="grand-label" style="color:${colors.grandText}">GRAND<br>TOTAL</span>${fmt(st.grand)}
+      </td>
+      <td rowspan="${totalRowspan}" class="grand-box col-summary-per" style="background:${colors.grandBg};color:${colors.grandText}">
+        <span class="grand-label" style="color:${colors.grandText}">PER<br>(%)</span>${fmt(st.per)}
+      </td>
+    </tr>
+    <tr>`;
+      subj1.forEach((s, sIdx) => {
+        const hc = getHeaderColorsForSubject(sIdx);
+        for(let k=0; k<s.colCount; k++){
+          h += `<th class="subhead-cell-1" style="background:${hc.subBg};color:${colors.subheadTextColor}">${formatSubhead(s.subheads[k])}</th>`;
+        }
+      });
+      if(r1ColSum < maxCols){
+        for(let k=0; k<(maxCols - r1ColSum); k++) h += `<th class="subhead-cell-1" style="background:#f1f5f9;color:${colors.subheadTextColor}">-</th>`;
+      }
+    h += `</tr>
+    <tr>`;
+      subj1.forEach((s, idx) => {
+        const b = st.blocks[idx] || [];
+        for(let k=0; k<s.colCount; k++){
+          const isTot = (k === s.colCount - 1);
+          h += `<td class="mark-val ${isTot ? 'total-val' : ''}" style="color:${colors.marksTextColor}">${fmt(b[k])}</td>`;
+        }
+      });
+      if(r1ColSum < maxCols){
+        for(let k=0; k<(maxCols - r1ColSum); k++) h += `<td class="mark-val" style="color:${colors.marksTextColor}">-</td>`;
+      }
+    h += `</tr>`;
+
+    if(hasRow2){
+      let r2ColSum = 0;
+      h += `<tr>`;
+        subj2.forEach((s, idx2) => {
+          const actualIdx = subj1.length + idx2;
+          const hc = getHeaderColorsForSubject(actualIdx);
+          h += `<th colspan="${s.colCount}" class="subj-head-2" style="background:${hc.headBg};color:${colors.headTextColor}">${esc(s.name)}</th>`;
+          r2ColSum += s.colCount;
+        });
+        if(r2ColSum < maxCols){
+          h += `<th colspan="${maxCols - r2ColSum}" class="subj-head-2" style="background:#e2e8f0;color:${colors.headTextColor}">-</th>`;
+        }
+      h += `</tr>
+      <tr>`;
+        subj2.forEach((s, idx2) => {
+          const actualIdx = subj1.length + idx2;
+          const hc = getHeaderColorsForSubject(actualIdx);
+          for(let k=0; k<s.colCount; k++){
+            h += `<th class="subhead-cell-2" style="background:${hc.subBg};color:${colors.subheadTextColor}">${formatSubhead(s.subheads[k])}</th>`;
+          }
+        });
+        if(r2ColSum < maxCols){
+          for(let k=0; k<(maxCols - r2ColSum); k++) h += `<th class="subhead-cell-2" style="background:#f1f5f9;color:${colors.subheadTextColor}">-</th>`;
+        }
+      h += `</tr>
+      <tr>`;
+        subj2.forEach((s, idx) => {
+          const b = st.blocks[subj1.length + idx] || [];
+          for(let k=0; k<s.colCount; k++){
+            const isTot = (k === s.colCount - 1);
+            h += `<td class="mark-val ${isTot ? 'total-val' : ''}" style="color:${colors.marksTextColor}">${fmt(b[k])}</td>`;
+          }
+        });
+        if(r2ColSum < maxCols){
+          for(let k=0; k<(maxCols - r2ColSum); k++) h += `<td class="mark-val" style="color:${colors.marksTextColor}">-</td>`;
+        }
+      h += `</tr>`;
+    }
+
+  h += `</tbody></table>`;
+  return h;
+}
+
+function buildModelHtml(model, sheetIndex){
+  const isFA = (model.examType === 'FA');
+  const totalSubj = model.subjects.length;
+  const colors = getThemeColors();
+  let perPage = (perPageSelect.value === 'auto') ? (isFA ? 15 : 5) : parseInt(perPageSelect.value, 10);
+  const totalPages = Math.ceil(model.students.length / perPage);
+  let fullHtml = '';
+
+  const activeTitle = editSchoolTitle.value.trim() || model.title;
+  const baseSubtitle = editSchoolSubtitle.value.trim() || model.subtitleBase;
+
+  if(isFA){
+    for(let p=0; p<totalPages; p++){
+      const slice = model.students.slice(p * perPage, (p + 1) * perPage);
+      const isFirstPage = (p === 0);
+      let pageHtml = `<div class="sheet">`;
+      if(isFirstPage){
+        pageHtml += `<div class="sheet-header"><div class="header-text-box"><div class="title" style="color:${colors.titleColor}">${esc(activeTitle)}</div><div class="subtitle" style="color:${colors.subtitleColor}">${esc(baseSubtitle)} ; Class : ${esc(model.sheetName)}</div></div></div>`;
+      }
+      pageHtml += `<div class="fa-table-wrap ${!isFirstPage ? 'fa-table-wrap-p2' : ''}"><table class="fa-table"><thead><tr><th class="fa-rn" style="width:9mm">ROLL</th><th class="fa-name" style="width:44mm">NAME OF STUDENTS</th>`;
+      model.subjects.forEach((s, sIdx) => {
+        const hc = getHeaderColorsForSubject(sIdx);
+        pageHtml += `<th class="fa-head" style="background:${hc.headBg};color:${colors.headTextColor}">${esc(s.name)}<br><span style="font-size:calc(7.5px * var(--font-scale));font-weight:normal;color:${colors.subheadTextColor}">(20)</span></th>`;
+      });
+      pageHtml += `<th class="fa-summary" style="width:16mm;background:${colors.grandBg};color:${colors.grandText}">TOTAL</th><th class="fa-summary" style="width:22mm;background:${colors.grandBg};color:${colors.grandText}">PER (%)</th></tr></thead><tbody>`;
+
+      slice.forEach((st) => {
+        pageHtml += `<tr><td class="fa-rn-val" style="background:#f1f5f9;color:${colors.rnTextColor}">${fmt(st.rn)}</td><td class="fa-name-val" style="background:#f1f5f9;color:${colors.nameTextColor}">${esc(st.name)}</td>`;
+        st.marks.forEach(m => { pageHtml += `<td class="fa-mark-val" style="color:${colors.marksTextColor}">${fmt(m)}</td>`; });
+        pageHtml += `<td class="fa-grand-val" style="background:${colors.grandBg};color:${colors.grandText}">${fmt(st.grand)}</td><td class="fa-grand-val fa-per-val" style="background:${colors.grandBg};color:${colors.grandText}">${fmt(st.per)}</td></tr>`;
+      });
+      pageHtml += `</tbody></table></div><div class="sheet-footer"><span>Class: <b>${esc(model.sheetName)}</b> (${totalSubj} Subj)</span><span>A4 LANDSCAPE</span><span>Page <b>${p + 1}</b> of <b>${totalPages}</b></span></div></div>`;
+      fullHtml += pageHtml;
+    }
+  } else {
+    const isMultiRow = (totalSubj > 4);
+    let splitCount = (totalSubj <= 4) ? totalSubj : Math.ceil(totalSubj / 2);
+    const subj1 = model.subjects.slice(0, splitCount);
+    const subj2 = model.subjects.slice(splitCount);
+    const r1Cols = subj1.reduce((sum, s) => sum + s.colCount, 0);
+    const r2Cols = subj2.reduce((sum, s) => sum + s.colCount, 0);
+    const maxCols = Math.max(r1Cols, r2Cols);
+
+    for(let p=0; p<totalPages; p++){
+      const slice = model.students.slice(p * perPage, (p + 1) * perPage);
+      const isFirstPage = (p === 0);
+      let pageHtml = `<div class="sheet">`;
+      if(isFirstPage){
+        pageHtml += `<div class="sheet-header"><div class="header-text-box"><div class="title" style="color:${colors.titleColor}">${esc(activeTitle)}</div><div class="subtitle" style="color:${colors.subtitleColor}">${esc(baseSubtitle)} ; Class : ${esc(model.sheetName)}</div></div></div>`;
+      }
+      pageHtml += `<div class="student-container ${!isFirstPage ? 'student-container-p2' : ''}">`;
+      slice.forEach((st, idx) => { pageHtml += renderStudentCardSA(st, subj1, subj2, maxCols, p * perPage + idx); });
+      pageHtml += `</div><div class="sheet-footer"><span>Class: <b>${esc(model.sheetName)}</b> (${totalSubj} Subj)</span><span>A4 LANDSCAPE</span><span>Page <b>${p + 1}</b> of <b>${totalPages}</b></span></div></div>`;
+      fullHtml += pageHtml;
+    }
+  }
+  return fullHtml;
+}
+
+function renderModelPages(model, sheetIndex){
+  preview.innerHTML = buildModelHtml(model, sheetIndex);
+}
+
+document.getElementById('showPreview').addEventListener('change', ()=>{
+  document.getElementById('previewSection').classList.toggle('hidden', !document.getElementById('showPreview').checked);
+});
+
+function generateCustomFileName(sheetName, subtitleText, loadedDocTitle){
+  const cleanSheet = String(sheetName || '').trim();
+  const fileStr = (loadedDocTitle || '') + ' ' + (subtitleText || '');
+  let sec = ''; const secMatch = fileStr.match(/SEC(?:TION)?\s*[-_:]?\s*([A-Z])/i) || cleanSheet.match(/\b([A-Z])\b$/);
+  if(secMatch) sec = `_SECTION_${secMatch[1].toUpperCase()}`;
+  let exam = '_RESULT_EXAM';
+  const cleanClass = cleanSheet.replace(/\s+/g,'_').toUpperCase();
+  return `CLASS_${cleanClass}${sec}${exam}`.replace(/[<>:"/\\|?*]+/g, '_');
+}
+
+function blobToBase64(blob){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader(); reader.onloadend = () => resolve(reader.result.split(',')[1]); reader.onerror = reject; reader.readAsDataURL(blob);
+  });
+}
+
+generateSingleBtn.addEventListener('click', async ()=>{
+  const selectedIdx = parseInt(classSelect.value, 10);
+  if(isNaN(selectedIdx) || !workbookModels[selectedIdx]) return;
+  const model = workbookModels[selectedIdx];
+  const fileName = generateCustomFileName(model.sheetName, editSchoolSubtitle.value, currentLoadedTitle);
+  statusEl.textContent = `Generating PDF for Class: ${model.sheetName}…`;
+  try{
+    preview.innerHTML = `<div class="combinedPrint">${buildModelHtml(model, selectedIdx)}</div>`;
+    const opt = {
+      margin: 0, filename: `${fileName}.pdf`, image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2.5, useCORS: true, backgroundColor: '#ffffff', scrollY: 0 },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }, pagebreak: { mode: ['css', 'legacy'] }
+    };
+    await html2pdf().set(opt).from(preview.firstElementChild).save();
+    statusEl.textContent = `PDF downloaded successfully!`; renderSelectedClass();
+  }catch(e){ statusEl.textContent = 'PDF Error: ' + e.message; }
+});
+
+generateAllBtn.addEventListener('click', async ()=>{
+  if(!workbookModels.length) return;
+  statusEl.textContent = `Generating Combined PDF for ALL classes…`;
+  try{
+    let combinedHtml = '';
+    for(let i=0; i<workbookModels.length; i++) combinedHtml += buildModelHtml(workbookModels[i], i);
+    preview.innerHTML = `<div class="combinedPrint">${combinedHtml}</div>`;
+    const opt = {
+      margin: 0, filename: `ALL_CLASSES_RESULT.pdf`, image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2.5, useCORS: true, backgroundColor: '#ffffff', scrollY: 0 },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }, pagebreak: { mode: ['css', 'legacy'] }
+    };
+    await html2pdf().set(opt).from(preview.firstElementChild).save();
+    statusEl.textContent = 'Combined PDF downloaded successfully!'; renderSelectedClass();
+  }catch(e){ statusEl.textContent = 'PDF Error: ' + e.message; }
+});
+
+generateSeparateBtn.addEventListener('click', async ()=>{
+  if(!workbookModels.length) return;
+  const onMobile = isMobileDevice();
+  statusEl.textContent = onMobile ? `Preparing PDFs for Drive…` : `Generating ZIP…`;
+  try{
+    const filesList = []; const zip = (!onMobile) ? new JSZip() : null;
+    for(let i=0; i<workbookModels.length; i++){
+      const model = workbookModels[i];
+      preview.innerHTML = `<div class="combinedPrint">${buildModelHtml(model, i)}</div>`;
+      statusEl.textContent = `Processing ${i+1}/${workbookModels.length}: Class ${model.sheetName}…`;
+      const customFileName = generateCustomFileName(model.sheetName, editSchoolSubtitle.value, currentLoadedTitle) + '.pdf';
+      const opt = {
+        margin: 0, filename: customFileName, image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2.5, useCORS: true, backgroundColor: '#ffffff', scrollY: 0 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }, pagebreak: { mode: ['css', 'legacy'] }
+      };
+      const blob = await html2pdf().set(opt).from(preview.firstElementChild).outputPdf('blob');
+      if(onMobile) filesList.push({ fileName: customFileName, base64Data: await blobToBase64(blob) });
+      else zip.file(customFileName, blob);
+    }
+    if(onMobile){
+      statusEl.textContent = `Uploading to Google Drive…`;
+      google.script.run.withSuccessHandler(res => {
+        statusEl.innerHTML = res.status === 'success' ? `✅ Saved! <a href="${res.folderUrl}" target="_blank">Open Drive Folder</a>` : 'Error: ' + res.message;
+        renderSelectedClass();
+      }).savePdfsToDrive(currentLoadedTitle || 'EXAM', filesList);
+    } else {
+      const zipBlob = await zip.generateAsync({type:'blob'});
+      const a = document.createElement('a'); a.href = URL.createObjectURL(zipBlob); a.download = 'CLASSES_ZIP.zip'; a.click();
+      setTimeout(()=>URL.revokeObjectURL(a.href), 2500); statusEl.textContent = 'ZIP download started!'; renderSelectedClass();
+    }
+  }catch(e){ statusEl.textContent = 'Error: ' + e.message; }
+});
+
+updateRootStyles();
+</script>
+</body>
+</html>
